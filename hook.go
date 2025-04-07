@@ -155,7 +155,8 @@ func Unregister(when uint8, cmds []string) bool {
 
 				for j, usedKey := range used {
 					if usedKey == keyIndex {
-						used = append(used[:j], used[j+1:]...)
+						// used = append(used[:j], used[j+1:]...)
+						used[j] = -1
 						break
 					}
 				}
