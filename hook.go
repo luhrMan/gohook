@@ -137,7 +137,7 @@ func Register(when uint8, cmds []string, cb func(Event)) {
 
 // Unregister removes a previously registered hook event handler
 // It takes the same parameters as Register to identify which hook to remove
-func Unregister(when uint8, cmds []string) bool {
+func Unregister(when uint8, cmds []string) {
 	lck.Lock()
 	defer lck.Unlock()
 
