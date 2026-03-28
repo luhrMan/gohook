@@ -44,11 +44,7 @@ func TestUnregister(t *testing.T) {
 			t.Fatalf("Registration failed, expected 1 event, got %d", len(events[KeyDown]))
 		}
 
-		result := Unregister(KeyDown, []string{"a", "b", "c"})
-
-		if !result {
-			t.Error("Unregister returned false for existing hook")
-		}
+		Unregister(KeyDown, []string{"a", "b", "c"})
 
 		if len(events[KeyDown]) != 0 {
 			t.Errorf("Unregister failed to remove hook, %d events remain", len(events[KeyDown]))
@@ -57,12 +53,7 @@ func TestUnregister(t *testing.T) {
 
 	t.Run("UnregisterNonExistentHook", func(t *testing.T) {
 		setupTest()
-
-		result := Unregister(KeyDown, []string{"x", "y", "z"})
-
-		if result {
-			t.Error("Unregister returned true for non-existent hook")
-		}
+		Unregister(KeyDown, []string{"x", "y", "z"})
 	})
 
 	t.Run("UnregisterWithDifferentOrder", func(t *testing.T) {
@@ -70,11 +61,7 @@ func TestUnregister(t *testing.T) {
 
 		Register(KeyDown, []string{"ctrl", "alt", "del"}, mockCallback)
 
-		result := Unregister(KeyDown, []string{"alt", "ctrl", "del"})
-
-		if !result {
-			t.Error("Unregister failed when key order was different")
-		}
+		Unregister(KeyDown, []string{"alt", "ctrl", "del"})
 
 		if len(events[KeyDown]) != 0 {
 			t.Errorf("Unregister failed to remove hook with different key order, %d events remain", len(events[KeyDown]))
@@ -88,11 +75,7 @@ func TestUnregister(t *testing.T) {
 		Register(KeyDown, []string{"c", "d"}, mockCallback)
 		Register(KeyUp, []string{"a", "b"}, mockCallback)
 
-		result := Unregister(KeyDown, []string{"a", "b"})
-
-		if !result {
-			t.Error("Failed to unregister specific hook")
-		}
+		Unregister(KeyDown, []string{"a", "b"})
 
 		if len(events[KeyDown]) != 1 {
 			t.Errorf("Expected 1 KeyDown event to remain, got %d", len(events[KeyDown]))
@@ -180,10 +163,7 @@ func TestUnregister(t *testing.T) {
 			t.Error("First callback was not called")
 		}
 
-		success := Unregister(KeyDown, []string{"ctrl", "alt", "del"})
-		if !success {
-			t.Fatal("Failed to unregister hook")
-		}
+		Unregister(KeyDown, []string{"ctrl", "alt", "del"})
 
 		if len(events[KeyDown]) != 0 {
 			t.Errorf("Unregister failed, %d events still registered", len(events[KeyDown]))

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/robotn/gohook"
+	hook "github.com/luhrMan/gohook"
 )
 
 func main() {
@@ -33,7 +33,6 @@ func main() {
 		case <-tout:
 			fmt.Print("Done.")
 			done = true
-			break
 		}
 	}
 

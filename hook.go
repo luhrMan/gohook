@@ -25,6 +25,7 @@ import "C"
 
 import (
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 	"unsafe"
@@ -114,8 +115,67 @@ func allPressed(pressed map[uint16]bool, keys ...uint16) bool {
 	return true
 }
 
+// AllKeysPressed reports whether every key named in cmds is currently held (same chord semantics as Register).
+func AllKeysPressed(cmds []string) bool {
+	lck.RLock()
+	defer lck.RUnlock()
+	for _, name := range cmds {
+		kc, ok := Keycode[name]
+		if !ok {
+			return false
+		}
+		if !pressed[kc] {
+			return false
+		}
+	}
+	return true
+}
+
+// ChordFullyReleased reports that none of the keys named in cmds are currently held.
+func ChordFullyReleased(cmds []string) bool {
+	lck.RLock()
+	defer lck.RUnlock()
+	for _, name := range cmds {
+		kc, ok := Keycode[name]
+		if !ok {
+			return false
+		}
+		if pressed[kc] {
+			return false
+		}
+	}
+	return true
+}
+
+// PressedKeyNames returns sorted key names for physical keys currently held, using Keycode
+// names (same strings as Register / ParseMacroHotkey). When multiple names map to the same
+// keycode, the lexicographically smallest name is used.
+func PressedKeyNames() []string {
+	lck.RLock()
+	defer lck.RUnlock()
+	byCode := make(map[uint16]string)
+	for name, code := range Keycode {
+		if !pressed[code] {
+			continue
+		}
+		prev, ok := byCode[code]
+		if !ok || name < prev {
+			byCode[code] = name
+		}
+	}
+	out := make([]string, 0, len(byCode))
+	for _, name := range byCode {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
 // Register register gohook event
 func Register(when uint8, cmds []string, cb func(Event)) {
+	lck.Lock()
+	defer lck.Unlock()
+
 	key := len(used)
 	used = append(used, key)
 	tmp := []uint16{}
@@ -152,6 +212,7 @@ func Unregister(when uint8, cmds []string) {
 				events[when] = append(eventKeys[:i], eventKeys[i+1:]...)
 
 				delete(keys, keyIndex)
+				delete(upkeys, keyIndex)
 				delete(cbs, keyIndex)
 
 				for j, usedKey := range used {
@@ -197,6 +258,13 @@ func equalKeySlices(a, b []uint16) bool {
 	return true
 }
 
+// procHandler is a snapshot of one registered handler so Process can invoke callbacks
+// without holding lck (callbacks may Register/Unregister) and without racing Unregister.
+type procHandler struct {
+	keys   []uint16
+	upkeys []uint16
+	fn     func(Event)
+}
 
 // Process return go hook process
 func Process(evChan <-chan Event) (out chan bool) {
@@ -210,18 +278,35 @@ func Process(evChan <-chan Event) (out chan bool) {
 				pressed[ev.Keycode] = false
 			}
 
-			for _, v := range events[ev.Kind] {
+			lck.RLock()
+			var handlers []procHandler
+			if ek, ok := events[ev.Kind]; ok {
+				handlers = make([]procHandler, 0, len(ek))
+				for _, v := range ek {
+					handlers = append(handlers, procHandler{
+						keys:   append([]uint16(nil), keys[v]...),
+						upkeys: append([]uint16(nil), upkeys[v]...),
+						fn:     cbs[v],
+					})
+				}
+			}
+			lck.RUnlock()
+
+			for _, h := range handlers {
 				if !asyncon {
 					break
 				}
+				if h.fn == nil {
+					continue
+				}
 
-				if allPressed(pressed, keys[v]...) {
-					cbs[v](ev)
+				if allPressed(pressed, h.keys...) {
+					h.fn(ev)
 				} else if ev.Kind == KeyUp {
 					//uppressed[ev.Keycode] = true
-					if allPressed(uppressed, upkeys[v]...) {
+					if allPressed(uppressed, h.upkeys...) {
 						uppressed = make(map[uint16]bool, 256)
-						cbs[v](ev)
+						h.fn(ev)
 					}
 				}
 			}
@@ -327,11 +412,15 @@ func End() {
 	}
 	close(ev)
 
+	lck.Lock()
+	defer lck.Unlock()
+
 	pressed = make(map[uint16]bool, 256)
 	uppressed = make(map[uint16]bool, 256)
 	used = []int{}
 
 	keys = map[int][]uint16{}
+	upkeys = map[int][]uint16{}
 	cbs = map[int]func(Event){}
 	events = map[uint8][]int{}
 }
