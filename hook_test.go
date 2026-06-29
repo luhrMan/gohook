@@ -2,6 +2,7 @@ package hook
 
 import (
 	"fmt"
+	"runtime"
 	"testing"
 
 	"github.com/vcaesar/tt"
@@ -15,10 +16,17 @@ func TestAdd(t *testing.T) {
 }
 
 func TestKey(t *testing.T) {
-	k := RawcodetoKeychar(0)
-	tt.Equal(t, "error", k)
+	k := RawcodeToKeychar(0)
+	switch runtime.GOOS {
+	case "darwin":
+		tt.Equal(t, "a", k)
+	case "windows":
+		tt.Equal(t, "error", k)
+	default: // linux: raw2keyLinux has no entry for rawcode 0
+		tt.Equal(t, "", k)
+	}
 
-	r := KeychartoRawcode("error")
+	r := KeycharToRawcode("error")
 	tt.Equal(t, 0, r)
 }
 
